@@ -73,36 +73,34 @@ jobs:
               svg = f'''<svg width="{width}" height="{height}" xmlns="http://www.w3.org/2000/svg">
                 <defs>
                   <linearGradient id="gradient" x1="0%" y1="0%" x2="100%" y2="100%">
-                    <stop offset="0%" style="stop-color:#00d4ff;stop-opacity:1" />
-                    <stop offset="100%" style="stop-color:#9c27b0;stop-opacity:1" />
+                    <stop offset="0%" style="stop-color:#8B4513;stop-opacity:1" />
+                    <stop offset="100%" style="stop-color:#D2691E;stop-opacity:1" />
                   </linearGradient>
-                  <filter id="glow">
-                    <feGaussianBlur stdDeviation="3" result="coloredBlur"/>
-                    <feMerge> 
-                      <feMergeNode in="coloredBlur"/>
-                      <feMergeNode in="SourceGraphic"/>
-                    </feMerge>
-                  </filter>
+                  <pattern id="paper" patternUnits="userSpaceOnUse" width="20" height="20">
+                    <rect width="20" height="20" fill="#F5F2E8"/>
+                    <path d="M 0,20 l 20,0 M 5,0 l 0,20" stroke="#E6D3A3" stroke-width="0.5"/>
+                  </pattern>
                 </defs>
-                <rect width="100%" height="100%" fill="#0a0a0a" rx="15"/>
-                <text x="400" y="30" text-anchor="middle" fill="url(#gradient)" font-family="JetBrains Mono, monospace" font-size="18" font-weight="bold">✨ Commit Timeline ✨</text>
+                <rect width="100%" height="100%" fill="url(#paper)" rx="8"/>
+                <rect x="20" y="20" width="760" height="360" fill="none" stroke="#8B4513" stroke-width="3"/>
+                <text x="400" y="50" text-anchor="middle" fill="#8B0000" font-family="serif" font-size="20" font-weight="bold">大正年間 作業記録簿</text>
           '''
               
               if commits:
                   y_pos = 80
                   for i, commit in enumerate(commits[:8]):
                       date_obj = datetime.fromisoformat(commit['date'].replace(' +0900', ''))
-                      date_str = date_obj.strftime('%m/%d')
+                      date_str = f"大正{date_obj.year-1911}年{date_obj.month}月{date_obj.day}日"
                       
-                      color = f"hsl({(i * 45) % 360}, 70%, 60%)"
+                      color = ["#8B0000", "#CD853F", "#D2691E", "#A0522D"][i % 4]
                       
                       svg += f'''
-                        <g transform="translate(50, {y_pos})">
-                          <circle cx="0" cy="0" r="6" fill="{color}" filter="url(#glow)"/>
-                          <line x1="6" y1="0" x2="700" y2="0" stroke="{color}" stroke-width="2" opacity="0.5"/>
-                          <text x="20" y="-8" fill="#ffffff" font-family="JetBrains Mono, monospace" font-size="12" font-weight="600">{commit['hash']}</text>
-                          <text x="20" y="8" fill="#888888" font-family="JetBrains Mono, monospace" font-size="10">{date_str}</text>
-                          <text x="120" y="5" fill="#cccccc" font-family="JetBrains Mono, monospace" font-size="11">{commit['message'][:50]}{'...' if len(commit['message']) > 50 else ''}</text>
+                        <g transform="translate(60, {y_pos})">
+                          <rect x="-5" y="-12" width="720" height="25" fill="#F5F2E8" stroke="#8B4513" stroke-width="1" opacity="0.7"/>
+                          <circle cx="0" cy="0" r="4" fill="{color}"/>
+                          <text x="15" y="-3" fill="#8B0000" font-family="serif" font-size="11" font-weight="bold">記録番号: {commit['hash']}</text>
+                          <text x="15" y="8" fill="#654321" font-family="serif" font-size="9">{date_str}</text>
+                          <text x="200" y="3" fill="#5D4E37" font-family="serif" font-size="10">{commit['message'][:40]}{'...' if len(commit['message']) > 40 else ''}</text>
                         </g>
                       '''
                       y_pos += 35
