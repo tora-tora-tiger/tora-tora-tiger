@@ -1,0 +1,127 @@
+name: Update Profile Stats
+
+on:
+  schedule:
+    - cron: '0 0 * * *'
+  workflow_dispatch:
+
+jobs:
+  update-stats:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+      
+      - name: Generate Commit Stats SVG
+        uses: lowlighter/metrics@latest
+        with:
+          token: ${{ secrets.METRICS_TOKEN }}
+          user: tora-tora-tiger
+          template: classic
+          base: header, activity, community, repositories, metadata
+          config_timezone: Asia/Tokyo
+          plugin_isocalendar: yes
+          plugin_isocalendar_duration: full-year
+          plugin_languages: yes
+          plugin_languages_analysis_timeout: 15
+          plugin_languages_categories: markup, programming
+          plugin_languages_colors: github
+          plugin_languages_limit: 8
+          plugin_languages_recent_categories: markup, programming
+          plugin_languages_recent_days: 14
+          plugin_languages_recent_load: 300
+          plugin_languages_sections: most-used
+          plugin_languages_threshold: 0%
+          plugin_activity: yes
+          plugin_activity_days: 14
+          plugin_activity_filter: all
+          plugin_activity_limit: 5
+          plugin_activity_load: 300
+          plugin_activity_visibility: all
+          
+      - name: Generate Custom Commit Visualization
+        run: |
+          cat > generate_commit_viz.py << 'EOF'
+          import json
+          import subprocess
+          from datetime import datetime, timedelta
+          import math
+          
+          def get_commit_data():
+              result = subprocess.run([
+                  'git', 'log', '--format=%H|%ad|%s', 
+                  '--date=iso', '--since=1 year ago'
+              ], capture_output=True, text=True)
+              
+              commits = []
+              for line in result.stdout.strip().split('\n'):
+                  if line:
+                      hash_val, date, msg = line.split('|', 2)
+                      commits.append({
+                          'hash': hash_val[:7],
+                          'date': date,
+                          'message': msg
+                      })
+              return commits
+          
+          def create_commit_svg(commits):
+              width, height = 800, 400
+              svg = f'''<svg width="{width}" height="{height}" xmlns="http://www.w3.org/2000/svg">
+                <defs>
+                  <linearGradient id="gradient" x1="0%" y1="0%" x2="100%" y2="100%">
+                    <stop offset="0%" style="stop-color:#8B4513;stop-opacity:1" />
+                    <stop offset="100%" style="stop-color:#D2691E;stop-opacity:1" />
+                  </linearGradient>
+                  <pattern id="paper" patternUnits="userSpaceOnUse" width="20" height="20">
+                    <rect width="20" height="20" fill="#F5F2E8"/>
+                    <path d="M 0,20 l 20,0 M 5,0 l 0,20" stroke="#E6D3A3" stroke-width="0.5"/>
+                  </pattern>
+                </defs>
+                <rect width="100%" height="100%" fill="url(#paper)" rx="8"/>
+                <rect x="20" y="20" width="760" height="360" fill="none" stroke="#8B4513" stroke-width="3"/>
+                <text x="400" y="50" text-anchor="middle" fill="#8B0000" font-family="serif" font-size="20" font-weight="bold">大正年間 作業記録簿</text>
+          '''
+              
+              if commits:
+                  y_pos = 80
+                  for i, commit in enumerate(commits[:8]):
+                      date_obj = datetime.fromisoformat(commit['date'].replace(' +0900', ''))
+                      date_str = f"大正{date_obj.year-1911}年{date_obj.month}月{date_obj.day}日"
+                      
+                      color = ["#8B0000", "#CD853F", "#D2691E", "#A0522D"][i % 4]
+                      
+                      svg += f'''
+                        <g transform="translate(60, {y_pos})">
+                          <rect x="-5" y="-12" width="720" height="25" fill="#F5F2E8" stroke="#8B4513" stroke-width="1" opacity="0.7"/>
+                          <circle cx="0" cy="0" r="4" fill="{color}"/>
+                          <text x="15" y="-3" fill="#8B0000" font-family="serif" font-size="11" font-weight="bold">記録番号: {commit['hash']}</text>
+                          <text x="15" y="8" fill="#654321" font-family="serif" font-size="9">{date_str}</text>
+                          <text x="200" y="3" fill="#5D4E37" font-family="serif" font-size="10">{commit['message'][:40]}{'...' if len(commit['message']) > 40 else ''}</text>
+                        </g>
+                      '''
+                      y_pos += 35
+              
+              svg += '</svg>'
+              return svg
+          
+          commits = get_commit_data()
+          svg_content = create_commit_svg(commits)
+          
+          with open('commit-viz.svg', 'w') as f:
+              f.write(svg_content)
+          
+          EOF
+          
+          python generate_commit_viz.py
+          
+      - name: Commit and push if changed
+        run: |
+          git config --local user.email "action@github.com"
+          git config --local user.name "GitHub Action"
+          git add .
+          git diff --staged --quiet || git commit -m "🤖 Update profile stats [skip ci]"
+          git push
